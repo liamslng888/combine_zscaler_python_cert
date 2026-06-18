@@ -73,7 +73,8 @@ on_interrupt() {
     cleanup
     rm -rf "$LOCK_FILE"
     rmdir "$LOCK_DIR" 2>/dev/null || true
-    echo -e "\n✘ Script interrupted."
+    echo ""
+    echo "✘ Script interrupted."
     exit 1
 }
 
@@ -122,7 +123,8 @@ if [[ -d "$CERT_DIR" ]]; then
     set -e
     
     if (( read_status != 0 )); then
-        echo -e "\n✘ Input failed. Aborting."
+        echo ""
+        echo "✘ Input failed. Aborting."
         exit 1
     fi
     
@@ -330,7 +332,8 @@ except Exception as e:
             set -e
             
             if (( read_status != 0 )); then
-                echo -e "\n✘ Input failed. Aborting."
+                echo ""
+                echo "✘ Input failed. Aborting."
                 exit 1
             fi
             
@@ -341,7 +344,8 @@ except Exception as e:
                     echo "=== Installing certifi on $cmd ==="
 
                     if ! "$cmd" -m pip install certifi; then
-                        echo -e "\n=== Failed to install certifi ==="
+                        echo ""
+                        echo "=== Failed to install certifi ==="
                         broken_versions+=("$cmd")
                         echo ""
                         continue
@@ -396,7 +400,8 @@ except Exception as e:
     set -e
     
     if (( read_status != 0 )); then
-        echo -e "\n✘ Input failed. Aborting."
+        echo ""
+        echo "✘ Input failed. Aborting."
         exit 1
     fi
     
@@ -632,7 +637,8 @@ if [[ -n "$selected_python_env" ]]; then
     # If any shell profile update fails, restore all previously modified
     # profile files from their backups to keep configuration consistent.
     if [[ "$rc_update_failed" == "true" ]]; then
-        echo -e "\n⚠ Triage: Shell profile updates failed. Initiating global rollback..."
+        echo ""
+        echo "⚠ Triage: Shell profile updates failed. Initiating global rollback..."
         for i in "${!UPDATED_RC_FILES[@]}"; do
             F="${UPDATED_RC_FILES[$i]}"
             M="${UPDATED_RC_MODES[$i]}"
@@ -672,7 +678,8 @@ if [[ -n "$selected_python_env" ]]; then
     done
 
     if [[ ${#RC_FILES[@]} -eq 0 ]]; then
-        echo -e "\n⚠ No shell profile was updated: neither ~/.zshrc nor ~/.bash_profile exists."
+        echo ""
+        echo "⚠ No shell profile was updated: neither ~/.zshrc nor ~/.bash_profile exists."
         echo ""
         echo "  The combined certificate bundle was created, but nothing will load it automatically."
         echo "  Add this line to whichever shell startup file you use:"
@@ -680,10 +687,12 @@ if [[ -n "$selected_python_env" ]]; then
     fi
 
     if [[ ${#skipped_versions[@]} -gt 0 ]]; then
-        echo -e "\n  Note: the following Python versions were skipped:\n    ${skipped_versions[*]}"
+        echo ""
+        echo "  Note: the following Python versions were skipped:\n    ${skipped_versions[*]}"
     fi
 
-    echo -e "\n  No changes were made to your Fish config. If you use Fish:"
+    echo ""
+    echo "  No changes were made to your Fish config. If you use Fish:"
     echo "  Add the following to ~/.config/fish/config.fish manually:"
     echo ""
     echo "    set -x SSL_CERT_FILE \"$COMBINED_CERT\""
@@ -700,7 +709,8 @@ if [[ -n "$selected_python_env" ]]; then
     echo ""
     exit 0
 else
-    echo -e "✘ Unable to locate a valid Python certificate bundle.\n"
+    echo "✘ Unable to locate a valid Python certificate bundle."
+    echo ""
     if [[ ${#available_versions[@]} -gt 0 ]]; then
         no_bundle=()
         for v in "${available_versions[@]}"; do
@@ -713,7 +723,8 @@ else
         [[ ${#skipped_versions[@]} -gt 0 ]] && echo "  Python versions skipped by user: ${skipped_versions[*]}"
         echo ""
     else
-        echo -e "  No Python installation was found.\n  Install Python via Homebrew (brew install python)\n"
+        echo "  No Python installation was found.\n  Install Python via Homebrew (brew install python)"
+        echo ""
     fi
     exit 1
 fi
