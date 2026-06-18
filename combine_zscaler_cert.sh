@@ -72,11 +72,12 @@ on_interrupt() {
     EXIT_CODE=1
     cleanup
     rm -rf "$LOCK_FILE"
+    rmdir "$LOCK_DIR" 2>/dev/null || true
     echo -e "\n✘ Script interrupted."
     exit 1
 }
 
-trap 'EXIT_CODE=$?; cleanup; rm -rf "$LOCK_FILE"' EXIT
+trap 'EXIT_CODE=$?; cleanup; rm -rf "$LOCK_FILE"; rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
 trap on_interrupt INT TERM
 
 prune_tmp_file_record_only() {
