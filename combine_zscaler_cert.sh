@@ -485,7 +485,7 @@ if [[ -n "$selected_python_env" ]]; then
 
         if ! cp "$RC_FILE" "$RC_BACKUP"; then
             echo "   ✘ Could not back up $RC_FILE — skipping to avoid data loss."
-            echo "     Add this line manually:  $SOURCE_LINE"
+            echo "      Add this line manually:  $SOURCE_LINE"
             rm -f "$RC_BACKUP"
             prune_tmp_file "$RC_TMP"
             rc_update_failed="true"
@@ -502,8 +502,8 @@ if [[ -n "$selected_python_env" ]]; then
         set -e
         if (( grep_exit > 1 )); then
             echo "   ✘ grep failed reading $RC_FILE (exit $grep_exit) — restoring backup."
-            if mv "$RC_BACKUP" "$RC_FILE"; then
-                prune_tmp_file_record_only "$RC_BACKUP"
+            if cat "$RC_BACKUP" > "$RC_FILE"; then
+                prune_tmp_file "$RC_BACKUP"
                 chmod "$original_mode" "$RC_FILE" 2>/dev/null || true
                 echo "   ✔ Backup restored successfully: $RC_FILE"
             else
@@ -549,8 +549,8 @@ if [[ -n "$selected_python_env" ]]; then
 
         if ! mv "$RC_TMP" "$REAL_DEST"; then
             echo "   ✘ Could not update $RC_FILE — attempting to restore backup."
-            if mv "$RC_BACKUP" "$RC_FILE"; then
-                prune_tmp_file_record_only "$RC_BACKUP"
+            if cat "$RC_BACKUP" > "$RC_FILE"; then
+                prune_tmp_file "$RC_BACKUP"
                 chmod "$original_mode" "$RC_FILE" 2>/dev/null || true
                 echo "   ✔ Backup restored successfully: $RC_FILE"
             else
@@ -582,8 +582,8 @@ if [[ -n "$selected_python_env" ]]; then
                 continue
             fi
 
-            if mv "$B" "$F"; then
-                prune_tmp_file_record_only "$B"
+            if cat "$B" > "$F"; then
+                prune_tmp_file "$B"
                 chmod "$M" "$F" 2>/dev/null || true
                 echo "   ✔ Reverted changes and restored permissions to $F ($M)"
             else
@@ -615,7 +615,7 @@ if [[ -n "$selected_python_env" ]]; then
         echo ""
         echo "  The combined certificate bundle was created, but nothing will load it automatically."
         echo "  Add this line to whichever shell startup file you use:"
-        echo "    $SOURCE_LINE"
+        echo "     $SOURCE_LINE"
     fi
 
     if [[ ${#skipped_versions[@]} -gt 0 ]]; then
@@ -625,16 +625,16 @@ if [[ -n "$selected_python_env" ]]; then
     echo -e "\n  No changes were made to your Fish config. If you use Fish:"
     echo "  Add the following to ~/.config/fish/config.fish manually:"
     echo ""
-    echo "    set -x SSL_CERT_FILE \"$COMBINED_CERT\""
-    echo "    set -x REQUESTS_CA_BUNDLE \"$COMBINED_CERT\""
-    echo "    set -x PIP_CERT \"$COMBINED_CERT\""
+    echo "     set -x SSL_CERT_FILE \"$COMBINED_CERT\""
+    echo "     set -x REQUESTS_CA_BUNDLE \"$COMBINED_CERT\""
+    echo "     set -x PIP_CERT \"$COMBINED_CERT\""
     echo ""
     echo "  Restart your terminal, or run:"
-    echo "    source \"$CORP_SSL_ENV\""
+    echo "     source \"$CORP_SSL_ENV\""
     echo ""
     echo "  Run these commands to completely revert changes made by this script:"
     for RC_FILE in "${RC_FILES[@]}"; do
-        echo "    perl -i -ne 'print unless /corp_cert\/\.corp_ssl_env\.sh/' \"$RC_FILE\""
+        echo "     perl -i -ne 'print unless /corp_cert\/\.corp_ssl_env\.sh/' \"$RC_FILE\""
     done
     echo ""
     exit 0
