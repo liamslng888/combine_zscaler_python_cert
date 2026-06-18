@@ -173,9 +173,82 @@ broken_versions=()
 skipped_versions=()
 selected_python_env=""
 
-python_candidates=("3")
-for version in 3.14 3.13 3.12 3.11 3.10 3.9; do
-    python_candidates+=("$version")
+# ===========================================================================
+# Dynamic Python Discovery (macOS Optimized)
+# ===========================================================================
+discovered_versions=()
+unversioned_candidates=()
+raw_list=""
+
+# Gather all raw python binaries on the system PATH depending on current shell
+if [ -n "$BASH_VERSION" ]; then
+    raw_list=$(compgen -c python 2>/dev/null)
+elif [ -n "$ZSH_VERSION" ]; then
+    raw_list=$(whence -m "python*" 2>/dev/null)
+else
+    raw_list=$(ls $(echo $PATH | tr ':' ' ') 2>/dev/null | grep '^python')
+fi
+
+# Separate exact versioned binaries (python3.13) from generic ones (python3)
+while read -r cmd; do
+    [ -z "$cmd" ] && continue
+    
+    if [[ "$cmd" =~ ^python[0-9]+\.[0-9]+$ ]]; then
+        duplicate=0
+        for item in "${discovered_versions[@]}"; do
+            [[ "$item" == "$cmd" ]] && duplicate=1 && break
+        done
+        if [ $duplicate -eq 0 ] && command -v "$cmd" >/dev/null 2>&1; then
+            discovered_versions+=("$cmd")
+        fi
+    elif [[ "$cmd" =~ ^python[0-9]*$ ]]; then
+        duplicate=0
+        for item in "${unversioned_candidates[@]}"; do
+            [[ "$item" == "$cmd" ]] && duplicate=1 && break
+        done
+        if [ $duplicate -eq 0 ] && command -v "$cmd" >/dev/null 2>&1; then
+            unversioned_candidates+=("$cmd")
+        fi
+    fi
+done <<< "$raw_list"
+
+# Sort the versioned array numerically (Highest Version First, e.g., 3.14 -> 3.9)
+for ((i = 0; i < ${#discovered_versions[@]}; i++)); do
+    for ((j = i + 1; j < ${#discovered_versions[@]}; j++)); do
+        [[ "${discovered_versions[i]}" =~ python([0-9]+)\.([0-9]+) ]]
+        ver1_maj="${BASH_REMATCH[1]}"
+        ver1_min="${BASH_REMATCH[2]}"
+        
+        [[ "${discovered_versions[j]}" =~ python([0-9]+)\.([0-9]+) ]]
+        ver2_maj="${BASH_REMATCH[1]}"
+        ver2_min="${BASH_REMATCH[2]}"
+        
+        if (( ver2_maj > ver1_maj )) || { (( ver2_maj == ver1_maj )) && (( ver2_min > ver1_min )); }; then
+            temp="${discovered_versions[i]}"
+            discovered_versions[i]="${discovered_versions[j]}"
+            discovered_versions[j]="$temp"
+        fi
+    done
+done
+
+# Assemble final array with priority rules
+python_candidates=()
+
+# 1. Force python3 to be absolute first choice if available
+if command -v python3 >/dev/null 2>&1; then
+    python_candidates+=("python3")
+fi
+
+# 2. Append the numerically sorted explicit versions
+for item in "${discovered_versions[@]}"; do
+    [[ "$item" != "python3" ]] && python_candidates+=("$item")
+done
+
+# 3. Append remaining unversioned binaries (like 'python') at the tail end
+for item in "${unversioned_candidates[@]}"; do
+    if [[ "$item" != "python3" ]]; then
+        python_candidates+=("$item")
+    fi
 done
 
 # ---------------------------------------------------------------------------
@@ -189,7 +262,7 @@ done
 # validate the resulting bundle, and generate the shell environment file.
 # ---------------------------------------------------------------------------
 for version in "${python_candidates[@]}"; do
-    cmd="python$version"
+    cmd="$version"
 
     if ! command -v "$cmd" >/dev/null 2>&1; then
         continue
