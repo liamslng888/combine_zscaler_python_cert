@@ -10,6 +10,12 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
     exit 1
 fi
 
+# Enforce interactive execution early as per design requirements
+if [[ ! -t 0 ]]; then
+    echo "✘ Error: This script modifies active shell profiles and must be run interactively."
+    exit 1
+fi
+
 # ---------------------------------------------------------------------------
 # combine_zscaler_cert.sh
 #
@@ -28,7 +34,10 @@ fi
 # shared path and permanently deny this script to other users.
 LOCK_DIR="${TMPDIR:-/tmp}"
 LOCK_DIR="${LOCK_DIR%/}/combine_zscaler_cert.$(id -u)"
-mkdir -p -m 700 "$LOCK_DIR" 2>/dev/null || true
+if ! mkdir -p -m 700 "$LOCK_DIR"; then
+    echo "✘ Failed to create lock directory: $LOCK_DIR"
+    exit 1
+fi
 LOCK_FILE="$LOCK_DIR/lock"
 if ! mkdir "$LOCK_FILE" 2>/dev/null; then
     echo "✘ Another instance of this script is already running. Aborting."
@@ -97,30 +106,22 @@ SOURCE_LINE="source \"$CORP_SSL_ENV\""
     exit 1
 }
 
-INTERACTIVE=false
-if [[ -t 0 ]]; then
-    INTERACTIVE=true
-fi
-
 if [[ -d "$CERT_DIR" ]]; then
     echo "⚠ The directory $CERT_DIR already exists."
     echo "  Re-generating the certificates will briefly disrupt active Python sessions."
     echo "" 
 
-    confirm_delete="n"
-    if [[ "$INTERACTIVE" == "true" ]]; then
-        set +e
-        read -r -t 60 -p "👉 Is it OK to delete the existing directory...? [y/n]: " confirm_delete
-        read_status=$?
-        set -e
-
-        if (( read_status > 128 )); then
-            echo -e "\n✘ Confirmation timed out. Aborting to protect current configuration."
-            exit 1
-        fi
-        # If the user pressed Enter, assign your intended default
-        [[ -z "$confirm_delete" ]] && confirm_delete="n"
+    set +e
+    read -r -t 60 -p "👉 Is it OK to delete the existing directory...? [y/n]: " confirm_delete
+    read_status=$?
+    set -e
+    
+    if (( read_status == 1 )); then
+        echo -e "\n✘ Confirmation timed out. Aborting."
+        exit 1
     fi
+    
+    [[ -z "$confirm_delete" ]] && confirm_delete="n"
 
     case "$confirm_delete" in
         [Yy])
@@ -241,22 +242,17 @@ except Exception as e:
     else
         certifi_path=$("$cmd" -c "import certifi; print(certifi.where())" 2>/dev/null || true)
         if [[ -z "$certifi_path" ]]; then
-            install_certifi="n"
-            if [[ "$INTERACTIVE" == "true" ]]; then
-                set +e
-                read -r -t 60 -p "   certifi is not installed for $cmd. Install it now? [y/n]: " install_certifi
-                read_status=$?
-                set -e
-
-                # Detect timeout (read returns >128 on timeout in bash)
-                if (( read_status > 128 )); then
-                    echo -e "\n✘ Confirmation timed out. Aborting script to safeguard state."
-                    exit 1
-                fi
-
-                # If user just pressed Enter, apply explicit default
-                [[ -z "$install_certifi" ]] && install_certifi="n"
+            set +e
+            read -r -t 60 -p "   certifi is not installed for $cmd. Install it now? [y/n]: " install_certifi
+            read_status=$?
+            set -e
+            
+            if (( read_status == 1 )); then
+                echo -e "\n✘ Confirmation timed out. Aborting."
+                exit 1
             fi
+            
+            [[ -z "$install_certifi" ]] && install_certifi="n"
 
             case "$install_certifi" in
                 [Yy])
@@ -312,23 +308,17 @@ except Exception as e:
         fi
     fi
 
-    use_this_python="n"
-
-    if [[ "$INTERACTIVE" == "true" ]]; then
-        set +e
-        read -r -t 60 -p "   Use this Python installation...? [y/n]: " use_this_python
-        read_status=$?
-        set -e
-
-        # Timeout detection
-        if (( read_status > 128 )); then
-            echo -e "\n   ✘ Confirmation timed out. Aborting script to safeguard state."
-            exit 1
-        fi
-
-        # Enter key default
-        [[ -z "$use_this_python" ]] && use_this_python="n"
+    set +e
+    read -r -t 60 -p "   Use this Python installation...? [y/n]: " use_this_python
+    read_status=$?
+    set -e
+    
+    if (( read_status == 1 )); then
+        echo -e "\n✘ Confirmation timed out. Aborting."
+        exit 1
     fi
+    
+    [[ -z "$use_this_python" ]] && use_this_python="n"
 
     case "$use_this_python" in
         [Yy])
@@ -376,6 +366,9 @@ except Exception as e:
 
     if (( zscaler_cert_count != 1 )); then
         echo "✘ Expected exactly 1 Zscaler certificate, found $zscaler_cert_count — aborting."
+        echo "  This usually happens if you have duplicate or expired Zscaler certificates"
+        echo "  inside your macOS Keychain. Please open Keychain Access, remove any"
+        echo "  duplicate legacy 'Zscaler Root CA' entries, and try again."
         exit 1
     fi
 
