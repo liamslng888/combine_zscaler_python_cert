@@ -533,7 +533,21 @@ if [[ -n "$selected_python_env" ]]; then
             break
         }
 
-        if ! mv "$RC_TMP" "$RC_FILE"; then
+        Determine the actual file path using Python (which is guaranteed to be available by Phase 2)
+        REAL_DEST=$("$selected_python_env" -c "
+        import os, sys
+        try:
+            print(os.path.realpath(sys.argv[1]))
+        except Exception:
+            print(sys.argv[1])
+        " "$RC_FILE" 2>/dev/null)
+        
+        # Fallback just in case the python execution fails entirely
+        if [[ -z "$REAL_DEST" ]]; then
+            REAL_DEST="$RC_FILE"
+        fi
+
+        if ! mv "$RC_TMP" "$REAL_DEST"; then
             echo "   ✘ Could not update $RC_FILE — attempting to restore backup."
             if mv "$RC_BACKUP" "$RC_FILE"; then
                 prune_tmp_file_record_only "$RC_BACKUP"
