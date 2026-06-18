@@ -547,7 +547,7 @@ if [[ -n "$selected_python_env" ]]; then
             REAL_DEST="$RC_FILE"
         fi
 
-        if ! mv "$RC_TMP" "$REAL_DEST"; then
+        if ! cat "$RC_TMP" > "$REAL_DEST"; then
             echo "   ✘ Could not update $RC_FILE — attempting to restore backup."
             if cat "$RC_BACKUP" > "$RC_FILE"; then
                 prune_tmp_file "$RC_BACKUP"
