@@ -10,12 +10,6 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
     exit 1
 fi
 
-LOCK_FILE="/tmp/combine_zscaler_cert.lock"
-if ! mkdir "$LOCK_FILE" 2>/dev/null; then
-    echo "✘ Another instance of this script is already running. Aborting."
-    exit 1
-fi
-
 # ---------------------------------------------------------------------------
 # combine_zscaler_cert.sh
 #
@@ -24,6 +18,26 @@ fi
 # environments to use the combined trust store.
 # ---------------------------------------------------------------------------
 
+if [[ -z "$HOME" || "$HOME" != /* ]]; then
+    echo "✘ \$HOME is not set to an absolute path — aborting."
+    exit 1
+fi
+
+# Lock file lives under a per-user directory (not shared /tmp) so a
+# malicious local user can't pre-create a directory at a predictable
+# shared path and permanently deny this script to other users.
+LOCK_DIR="${TMPDIR:-/tmp}"
+LOCK_DIR="${LOCK_DIR%/}/combine_zscaler_cert.$(id -u)"
+mkdir -p -m 700 "$LOCK_DIR" 2>/dev/null || true
+LOCK_FILE="$LOCK_DIR/lock"
+if ! mkdir "$LOCK_FILE" 2>/dev/null; then
+    echo "✘ Another instance of this script is already running. Aborting."
+    exit 1
+fi
+
+# Set traps immediately after acquiring the lock — no other code may run
+# between lock acquisition and trap registration, or a kill in that window
+# would leave a stale lock behind forever.
 TMP_FILES=()
 rc_update_failed="false"
 UPDATED_RC_BACKUPS=()
@@ -49,12 +63,8 @@ on_interrupt() {
     exit 1
 }
 
-same_filesystem() {
-    local src_dev dst_dev
-    src_dev=$(stat -f "%d" "$1" 2>/dev/null) || return 2
-    dst_dev=$(stat -f "%d" "$2" 2>/dev/null) || return 2
-    [[ "$src_dev" == "$dst_dev" ]]
-}
+trap 'EXIT_CODE=$?; cleanup; rm -rf "$LOCK_FILE"' EXIT
+trap on_interrupt INT TERM
 
 prune_tmp_file_record_only() {
     local target="$1" new_list=()
@@ -75,14 +85,6 @@ prune_tmp_file() {
     done
     TMP_FILES=("${new_list[@]}")
 }
-
-trap 'EXIT_CODE=$?; cleanup; rm -rf "$LOCK_FILE"' EXIT
-trap on_interrupt INT TERM
-
-if [[ -z "$HOME" || "$HOME" != /* ]]; then
-    echo "✘ \$HOME is not set to an absolute path — aborting."
-    exit 1
-fi
 
 CERT_DIR="$HOME/corp_cert"
 ZSCALER_CERT="$CERT_DIR/zscaler.pem"
@@ -367,8 +369,8 @@ except Exception as e:
         exit 1
     fi
 
-    source_cert_count=$(grep -c "^-----BEGIN CERTIFICATE-----" "$cert_local" || true)
-    zscaler_cert_count=$(grep -c "^-----BEGIN CERTIFICATE-----" "$ZSCALER_CERT" || true)
+    source_cert_count=$(grep -c "^-----BEGIN CERTIFICATE-----$" "$cert_local" || true)
+    zscaler_cert_count=$(grep -c "^-----BEGIN CERTIFICATE-----$" "$ZSCALER_CERT" || true)
     [[ "$source_cert_count"  =~ ^[0-9]+$ ]] || { echo "✘ Could not read cert count from CA bundle: '$source_cert_count'";  exit 1; }
     [[ "$zscaler_cert_count" =~ ^[0-9]+$ ]] || { echo "✘ Could not read cert count from Zscaler cert: '$zscaler_cert_count'"; exit 1; }
 
@@ -424,9 +426,9 @@ except Exception as e:
     # Confirm that the merged bundle contains all source certificates plus
     # the exported Zscaler certificate. This helps detect truncation or
     # incomplete writes.
-    expected_min=$(( source_cert_count + 1 ))
-    if (( combined_cert_count < expected_min )); then
-        echo "✘ Post-merge validation failed: expected at least $expected_min certificates"
+    expected_total=$(( source_cert_count + 1 ))
+    if (( combined_cert_count != expected_total )); then
+        echo "✘ Post-merge validation failed: expected exactly $expected_total certificates, found $combined_cert_count"
         exit 1
     fi
     echo "   ✔ Post-merge validation passed ($source_cert_count source + 1 Zscaler = $combined_cert_count certificates)"
@@ -491,16 +493,6 @@ if [[ -n "$selected_python_env" ]]; then
         fi
 
         TMP_FILES+=("$RC_BACKUP")
-
-        bak_fs_result=0
-        same_filesystem "$RC_BACKUP" "$RC_FILE" || bak_fs_result=$?
-        if (( bak_fs_result != 0 )); then
-            echo "   ✘ Backup cross-filesystem validation failed for $RC_FILE"
-            prune_tmp_file "$RC_BACKUP"
-            prune_tmp_file "$RC_TMP"
-            rc_update_failed="true"
-            break
-        fi
 
         chmod "$original_mode" "$RC_BACKUP" 2>/dev/null || true
 
