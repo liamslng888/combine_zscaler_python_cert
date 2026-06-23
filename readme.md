@@ -102,4 +102,4 @@ If you added a Fish snippet manually, remove those three `set -x` lines from `~/
 
 - The script uses a lock file (`/tmp/combine_zscaler_cert.lock`) to prevent two copies from running at the same time.
 - All files it creates are restricted to owner-only permissions (`umask 077`).
-- Re-running the script is safe: it detects and offers to replace a previous `~/corp_cert` setup, and removes any old source line from your shell profiles before adding the current one, so you won't end up with duplicates.
+- Re-running the script is safe: it detects and offers to replace a previous `~/corp_cert` setup, and removes any old export line from your shell profiles before adding the current one, so you won't end up with duplicates.
