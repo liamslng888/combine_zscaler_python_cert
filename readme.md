@@ -57,18 +57,13 @@ The script only edits `~/.zshrc` and `~/.bash_profile`, and only if they already
 In that case, create one of those files yourself and add the source line it gives you, for example:
 
 ```bash
+touch ~/.zshrc
 { echo "# >>> Zscaler combined CA (managed by PyZTrust.sh) >>>"
 echo "export SSL_CERT_FILE="~/corp_cert/combined-ca.pem""
 echo "export REQUESTS_CA_BUNDLE="~/corp_cert/combined-ca.pem""
 echo "export PIP_CERT="~/corp_cert/combined-ca.pem""
 echo "# <<< Zscaler combined CA (managed by PyZTrust.sh) <<<" } >> ~/.zshrc
 ```
-
-# >>> Zscaler combined CA (managed by PyZTrust.sh) >>>
-export SSL_CERT_FILE="/Users/liang1/corp_cert/combined-ca.pem"
-export REQUESTS_CA_BUNDLE="/Users/liang1/corp_cert/combined-ca.pem"
-export PIP_CERT="/Users/liang1/corp_cert/combined-ca.pem"
-# <<< Zscaler combined CA (managed by PyZTrust.sh) <<<
 
 (`zsh` is the default shell on modern macOS, so `~/.zshrc` is usually the right choice unless you specifically use `bash`.)
 
